@@ -21,6 +21,9 @@
     },
     "plugins": [
       "expo-status-bar"
-    ]
+    ],
+    "experiments": {
+      "baseUrl": "/rewardsexp1"
+    }
   }
 }
