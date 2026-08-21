@@ -1,3 +1,14 @@
+/**
+ * Demo phase selector — prototype-only control.
+ *
+ * Purple-tinted to signal it is NOT part of the member-facing product UI.
+ *
+ * Phases:
+ *   Ctrl → Control: baseline Community experience (no rewards progression)
+ *   MVP  → Experiment 1 MVP: Member + Explorer + Contributor at 200 pts
+ *   FF1  → Fast Follow 1: MVP + persistent benefit visibility on Home
+ *   FF2  → Fast Follow 2: FF1 + enhanced activity-completion feedback
+ */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useJourney } from '../context/JourneyContext';
@@ -5,12 +16,11 @@ import { typography, spacing, radius } from '../theme';
 
 const PHASES = [
   { key: 'control', label: 'Ctrl' },
-  { key: 1, label: 'P1' },
-  { key: 2, label: 'P2' },
-  { key: 3, label: 'P3' },
+  { key: 'mvp',     label: 'MVP'  },
+  { key: 'ff1',     label: 'FF1'  },
+  { key: 'ff2',     label: 'FF2'  },
 ];
 
-// Prototype-only control — clearly purple-tinted to signal it is not part of the product UI.
 export default function PhaseSelector() {
   const { currentPhase, switchPhase } = useJourney();
 
@@ -20,7 +30,7 @@ export default function PhaseSelector() {
       <View style={styles.pills}>
         {PHASES.map(({ key, label }) => (
           <TouchableOpacity
-            key={String(key)}
+            key={key}
             style={[styles.pill, currentPhase === key && styles.pillActive]}
             onPress={() => switchPhase(key)}
             activeOpacity={0.75}
@@ -53,7 +63,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: radius.full,
-    minWidth: 30,
+    minWidth: 34,
     alignItems: 'center',
   },
   pillActive: { backgroundColor: PROTO },

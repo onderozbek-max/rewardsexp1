@@ -1,59 +1,54 @@
-import React, { useRef, useState, useEffect } from 'react';
+/**
+ * SurveyScreen — Onboarding surveys.
+ *
+ * Completing both surveys → Explorer unlock (survey-completion gate, NOT points-gated).
+ * Onboarding surveys award 0 progression points toward Contributor.
+ * PROTOTYPE ASSUMPTION: pre-Explorer activity points not counted — unresolved per §32.
+ *
+ * Flow:
+ *   control phase → completeOnboarding() directly (no celebration)
+ *   mvp/ff1/ff2   → navigate to ExplorerCelebration
+ */
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import SurveyCard from '../components/SurveyCard';
 import { useJourney } from '../context/JourneyContext';
 import { ONBOARDING_SURVEYS } from '../data/journey';
-import { colors, typography, spacing, radius, shadows } from '../theme';
+import { colors, typography, spacing, radius } from '../theme';
 
 export default function SurveyScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { points, completeSurvey, isSurveyCompleted } = useJourney();
-  const [completedCount, setCompletedCount] = useState(0);
+  const { currentPhase, completeSurvey, isSurveyCompleted, completeOnboarding } = useJourney();
   const [navigating, setNavigating] = useState(false);
 
-  const pointsAnim = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const completedCount = ONBOARDING_SURVEYS.filter((sv) => isSurveyCompleted(sv.id)).length;
 
-  const totalPoints = ONBOARDING_SURVEYS.reduce((s, sv) => s + sv.rewardPoints, 0);
-
-  useEffect(() => {
-    Animated.spring(pointsAnim, {
-      toValue: points,
-      tension: 80,
-      friction: 12,
-      useNativeDriver: false,
-    }).start();
-
-    const pct = Math.min(points / totalPoints, 1);
-    Animated.spring(progressAnim, {
-      toValue: pct,
-      tension: 60,
-      friction: 10,
-      useNativeDriver: false,
-    }).start();
-  }, [points]);
-
-  const handleSurveyComplete = (surveyId, rewardPoints) => {
-    completeSurvey(surveyId, rewardPoints);
+  const handleSurveyComplete = (surveyId) => {
+    // 0 progression points — Explorer is survey-gated, not point-gated.
+    completeSurvey(surveyId, 0);
     const newCount = completedCount + 1;
-    setCompletedCount(newCount);
 
-    // All surveys done → navigate to celebration after a short delay
     if (newCount === ONBOARDING_SURVEYS.length && !navigating) {
       setNavigating(true);
       setTimeout(() => {
-        navigation.navigate('Celebration');
+        if (currentPhase === 'control') {
+          // Control: no celebration — jump directly to Community Home.
+          completeOnboarding();
+        } else {
+          navigation.navigate('ExplorerCelebration');
+        }
       }, 900);
     }
   };
+
+  const progressFraction = completedCount / ONBOARDING_SURVEYS.length;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -63,37 +58,21 @@ export default function SurveyScreen({ navigation }) {
         style={styles.header}
       >
         <Text style={styles.eyebrow}>Getting Started</Text>
-        <Text style={styles.title}>Your First Surveys</Text>
+        <Text style={styles.title}>Onboarding Surveys</Text>
         <Text style={styles.subtitle}>
-          Complete both onboarding surveys to join the community and start earning.
+          Complete both surveys to unlock Explorer and begin earning progression points.
         </Text>
 
-        {/* Points progress tracker */}
-        <View style={styles.pointsTracker}>
-          <View style={styles.pointsRow}>
-            <Text style={styles.pointsLabel}>Points Earned</Text>
-            <Text style={styles.pointsValue}>
-              ⭐ {points} / {totalPoints}
+        {/* Survey completion progress */}
+        <View style={styles.progressTracker}>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressLabel}>Surveys completed</Text>
+            <Text style={styles.progressValue}>
+              {completedCount} / {ONBOARDING_SURVEYS.length}
             </Text>
           </View>
           <View style={styles.progressTrack}>
-            <Animated.View
-              style={[
-                styles.progressFill,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-              ]}
-            />
-          </View>
-          <View style={styles.surveyCounts}>
-            <Text style={styles.surveyCountText}>
-              {ONBOARDING_SURVEYS.filter((sv) => isSurveyCompleted(sv.id)).length} of{' '}
-              {ONBOARDING_SURVEYS.length} surveys completed
-            </Text>
+            <View style={[styles.progressFill, { width: `${progressFraction * 100}%` }]} />
           </View>
         </View>
       </LinearGradient>
@@ -121,14 +100,15 @@ export default function SurveyScreen({ navigation }) {
           );
         })}
 
-        {/* Unlock preview */}
+        {/* Explorer unlock destination */}
         <View style={styles.unlockPreview}>
           <View style={styles.unlockIconRow}>
-            <Text style={styles.unlockIcon}>🌟</Text>
+            <Text style={styles.unlockIcon}>🔭</Text>
           </View>
-          <Text style={styles.unlockTitle}>Unlock Member</Text>
+          <Text style={styles.unlockTitle}>Unlock Explorer</Text>
           <Text style={styles.unlockDesc}>
-            Complete both surveys to unlock Member and start receiving community benefits.
+            Complete both surveys to become an Explorer — then start earning progression
+            points toward Contributor (200 pts).
           </Text>
         </View>
       </ScrollView>
@@ -162,47 +142,37 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     lineHeight: 20,
   },
-  pointsTracker: {
+  progressTracker: {
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: radius.lg,
     padding: spacing.md,
   },
-  pointsRow: {
+  progressRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  pointsLabel: {
+  progressLabel: {
     ...typography.smallMed,
     color: 'rgba(255,255,255,0.75)',
   },
-  pointsValue: {
+  progressValue: {
     ...typography.smallBold,
-    color: colors.gold,
+    color: '#FFFFFF',
   },
   progressTrack: {
     height: 6,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: spacing.xs,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.gold,
+    backgroundColor: '#FFFFFF',
     borderRadius: 3,
   },
-  surveyCounts: {
-    alignItems: 'flex-end',
-  },
-  surveyCountText: {
-    ...typography.caption,
-    color: 'rgba(255,255,255,0.6)',
-  },
-  scroll: {
-    flex: 1,
-  },
+  scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
@@ -232,9 +202,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  unlockIcon: {
-    fontSize: 28,
-  },
+  unlockIcon: { fontSize: 28 },
   unlockTitle: {
     ...typography.h4,
     color: colors.blue,

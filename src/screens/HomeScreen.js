@@ -19,7 +19,11 @@ import { COMMUNITY_ACTIVITIES, STAGES } from '../data/journey';
 import { MOCK_MEMBER } from '../data/profile';
 import { colors, typography, spacing, radius, shadows } from '../theme';
 
-const WATCHABLE = STAGES.filter((s) => s.id > 1);
+// Only watch point-gated stages with a numeric threshold.
+// Influencer/Co-creator have thresholdTBD: true — never trigger from point-crossing.
+const WATCHABLE = STAGES.filter(
+  (s) => typeof s.pointsRequired === 'number' && !s.thresholdTBD && s.id > 1
+);
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();

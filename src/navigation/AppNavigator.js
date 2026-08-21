@@ -4,8 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import WelcomeScreen from '../screens/WelcomeScreen';
+import MemberCelebrationScreen from '../screens/MemberCelebrationScreen';
 import SurveyScreen from '../screens/SurveyScreen';
-import CelebrationScreen from '../screens/CelebrationScreen';
+import CelebrationScreen from '../screens/CelebrationScreen';  // ExplorerCelebration
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import StageTransitionScreen from '../screens/StageTransitionScreen';
@@ -107,7 +108,7 @@ function MainTabs() {
   );
 }
 
-// ── Main stack (tabs + transition screens) ────────────────────────────────────
+// ── Main stack (tabs + Contributor transition screen) ─────────────────────────
 
 function MainStackNavigator() {
   return (
@@ -131,9 +132,23 @@ export default function AppNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       {!hasOnboarded ? (
         <>
+          {/* Join flow — Member → Explorer → Contributor progression education */}
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
-          <Stack.Screen name="Survey" component={SurveyScreen} options={{ animation: 'slide_from_right' }} />
-          <Stack.Screen name="Celebration" component={CelebrationScreen} options={{ animation: 'fade' }} />
+          <Stack.Screen
+            name="MemberCelebration"
+            component={MemberCelebrationScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="Survey"
+            component={SurveyScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="ExplorerCelebration"
+            component={CelebrationScreen}
+            options={{ animation: 'fade' }}
+          />
         </>
       ) : (
         <Stack.Screen name="Main" component={MainStackNavigator} options={{ animation: 'fade' }} />

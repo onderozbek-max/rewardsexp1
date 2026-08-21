@@ -1,19 +1,21 @@
 /**
- * Compact rewards progress header — sits within the Community Home, not replacing it.
+ * Compact rewards progress header — sits inside Community Home, not replacing it.
  *
- * Phase 1: Stage + points + progress bar + locked next stage. No benefits.
- * Phase 2/3: Adds current benefit chips (ⓘ accordion) + next-stage benefit preview.
+ * MVP  (control off): Stage + points + progress bar + "Next: 🔒 Contributor" — NO benefits.
+ * FF1+ (showBenefitsHome): Adds earned benefit chips with ⓘ accordion + next-stage preview.
  *
- * Spec: "compact status/progress component, not an entire rewards dashboard."
- *       "The existing Open Activities section should remain visible immediately below."
+ * Rules:
+ * - Returns null in control mode (caller also guards, but safety net here).
+ * - No bar shown when nextStage.thresholdTBD (Influencer/Co-creator — TBD threshold).
+ * - Influencer/Co-creator shown as "Future direction" with no numeric threshold.
+ * - "Spec: compact status/progress component, not an entire rewards dashboard."
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ProgressBar from './ProgressBar';
 import { useJourney } from '../context/JourneyContext';
 import { colors, typography, spacing, radius, shadows } from '../theme';
-import { STAGES } from '../data/journey';
 
 const MAX_CHIPS = 2;
 
@@ -25,20 +27,42 @@ export default function JourneyCard() {
     nextStage,
     pointsToNextStage,
     progressPercent,
-    nextRequirementMet,
+    showBenefitsHome,
+    phaseConfig,
+    lastDelta,
+    clearLastDelta,
   } = useJourney();
-
-  // Should never render in control mode — caller is responsible for the guard,
-  // but add a safety net here too.
-  if (currentPhase === 'control' || !currentStage) return null;
-
-  const next = nextStage;
-  const showBenefitLayer = currentPhase >= 2 && (currentStage.benefits?.length ?? 0) > 0;
-  const visibleBenefits = currentStage.benefits?.slice(0, MAX_CHIPS) ?? [];
-  const overflowCount = (currentStage.benefits?.length ?? 0) - MAX_CHIPS;
 
   const [showAccordion, setShowAccordion] = useState(false);
   const accordionAnim = useRef(new Animated.Value(0)).current;
+
+  // FF2: animate delta badge when a new delta arrives
+  const deltaOpacity = useRef(new Animated.Value(0)).current;
+  const deltaSlide = useRef(new Animated.Value(0)).current;
+  const enhancedFeedback = phaseConfig?.enhancedFeedback === true;
+
+  useEffect(() => {
+    if (!enhancedFeedback || lastDelta <= 0) return;
+    // Slide up and fade in, then fade out
+    deltaSlide.setValue(0);
+    deltaOpacity.setValue(0);
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(deltaOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.timing(deltaSlide, { toValue: -8, duration: 280, useNativeDriver: true }),
+      ]),
+      Animated.delay(1200),
+      Animated.timing(deltaOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+    ]).start(() => clearLastDelta());
+  }, [lastDelta, enhancedFeedback]);
+
+  // Safety: never render in control mode or before a stage is established.
+  if (currentPhase === 'control' || !currentStage) return null;
+
+  const nextIsTBD = nextStage?.thresholdTBD === true;
+  const showBenefitLayer = showBenefitsHome && (currentStage.benefits?.length ?? 0) > 0;
+  const visibleBenefits = currentStage.benefits?.slice(0, MAX_CHIPS) ?? [];
+  const overflowCount = (currentStage.benefits?.length ?? 0) - MAX_CHIPS;
 
   const toggleAccordion = () => {
     if (showAccordion) {
@@ -59,7 +83,7 @@ export default function JourneyCard() {
         end={{ x: 1, y: 1 }}
         style={card.body}
       >
-        {/* Row 1: Stage + optional ⓘ + points */}
+        {/* Row 1: Stage icon + name + optional ⓘ + points */}
         <View style={card.topRow}>
           <View style={card.stageLeft}>
             <Text style={card.stageIcon}>{currentStage.icon}</Text>
@@ -75,10 +99,10 @@ export default function JourneyCard() {
               </TouchableOpacity>
             )}
           </View>
-          <Text style={card.points}>{points} ⭐</Text>
+          <Text style={card.points}>{points} pts</Text>
         </View>
 
-        {/* Benefit chips (Phase 2/3, collapsed row) */}
+        {/* Benefit chips (FF1+, collapsed row) */}
         {showBenefitLayer && !showAccordion && (
           <View style={card.chipsRow}>
             {visibleBenefits.map((b, i) => (
@@ -89,13 +113,13 @@ export default function JourneyCard() {
             ))}
             {overflowCount > 0 && (
               <TouchableOpacity style={card.chipMore} onPress={toggleAccordion}>
-                <Text style={card.chipMoreText}>+{overflowCount}</Text>
+                <Text style={card.chipMoreText}>+{overflowCount} more</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        {/* Benefit accordion (Phase 2/3, expanded) */}
+        {/* Benefit accordion (FF1+, expanded) */}
         {showBenefitLayer && showAccordion && (
           <Animated.View style={{ opacity: accordionAnim }}>
             <View style={card.accordionDivider} />
@@ -112,46 +136,73 @@ export default function JourneyCard() {
           </Animated.View>
         )}
 
-        {/* Progress bar */}
-        <ProgressBar
-          progress={progressPercent}
-          height={5}
-          trackColor="rgba(255,255,255,0.22)"
-          fillColor="#FFFFFF"
-          style={card.progressBar}
-        />
+        {/* Progress bar — hidden when next stage threshold is TBD */}
+        {!nextIsTBD && (
+          <ProgressBar
+            progress={progressPercent}
+            height={5}
+            trackColor="rgba(255,255,255,0.22)"
+            fillColor="#FFFFFF"
+            style={card.progressBar}
+          />
+        )}
 
-        {/* Progress labels + next stage */}
+        {/* FF2: delta badge — shows "+N pts" inline after activity completion */}
+        {enhancedFeedback && lastDelta > 0 && (
+          <Animated.View
+            style={[card.deltaBadge, { opacity: deltaOpacity, transform: [{ translateY: deltaSlide }] }]}
+            pointerEvents="none"
+          >
+            <Text style={card.deltaText}>
+              +{lastDelta} pts · now {points}/{nextStage?.pointsRequired ?? '—'}
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* Progress labels */}
         <View style={card.progressRow}>
-          {next ? (
-            <>
-              {nextRequirementMet ? (
-                // Spec §8: must not say "0 points until Explorer" when past threshold but locked
-                <Text style={card.progressPts}>
-                  {points} pts  ·  Explorer requirement reached ✓
-                </Text>
-              ) : (
-                <Text style={card.progressPts}>
-                  {points} / {next.pointsRequired} pts
-                </Text>
-              )}
-              <Text style={card.nextLabel}>
-                {nextRequirementMet ? 'Unlock coming soon 🔒' : `Next: 🔒 ${next.name}`}
+          {nextStage ? (
+            nextIsTBD ? (
+              // Contributor is terminal for Exp 1 — show Influencer as future direction
+              <Text style={card.progressPts}>
+                {currentStage.name} · {currentStage.meaning}
               </Text>
-            </>
+            ) : (
+              // Explorer → Contributor: show numeric progress
+              <Text style={card.progressPts}>
+                {points} / {nextStage.pointsRequired} pts
+              </Text>
+            )
           ) : (
             <Text style={card.progressPts}>{points} pts</Text>
           )}
+
+          {nextStage && (
+            <Text style={card.nextLabel}>
+              {nextIsTBD
+                ? `Future: ${nextStage.icon} ${nextStage.name}`
+                : `Next: 🔒 ${nextStage.name}`}
+            </Text>
+          )}
         </View>
 
-        {/* Next-stage benefit preview (Phase 2/3 only — compact text) */}
-        {currentPhase >= 2 && next && !nextRequirementMet && (
+        {/* Next-stage benefit preview (FF1+ only, not shown when TBD) */}
+        {showBenefitsHome && nextStage && !nextIsTBD && nextStage.benefits && (
           <View style={card.nextPreview}>
-            {next.benefits.slice(0, 2).map((b, i) => (
+            {nextStage.benefits.slice(0, 2).map((b, i) => (
               <Text key={i} style={card.nextPreviewItem} numberOfLines={1}>
                 · {b.title}
               </Text>
             ))}
+          </View>
+        )}
+
+        {/* Future direction note when at Contributor (next = Influencer TBD) */}
+        {showBenefitsHome && nextStage && nextIsTBD && (
+          <View style={card.futureNote}>
+            <Text style={card.futureNoteText}>
+              🏆 {nextStage.name} · Future direction — threshold under calibration
+            </Text>
           </View>
         )}
       </LinearGradient>
@@ -218,4 +269,18 @@ const card = StyleSheet.create({
     paddingTop: spacing.xs,
   },
   nextPreviewItem: { ...typography.caption, color: 'rgba(255,255,255,0.6)', marginBottom: 2 },
+  deltaBadge: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
+    marginBottom: spacing.xs,
+  },
+  deltaText: { ...typography.captionMed, color: '#FFFFFF', fontSize: 11 },
+  futureNote: {
+    marginTop: spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.12)',
+    paddingTop: spacing.xs,
+  },
+  futureNoteText: { ...typography.caption, color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' },
 });

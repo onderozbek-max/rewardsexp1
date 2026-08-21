@@ -1,3 +1,13 @@
+/**
+ * CelebrationScreen — Moment 2 of 3 distinct celebration milestones.
+ * Screen name in navigator: 'ExplorerCelebration'
+ *
+ * Triggered after: both onboarding surveys completed.
+ * Celebrates: Explorer (Tier 1 · PARTICIPATE).
+ * Next step: earn 200 progression points to unlock Contributor.
+ *
+ * Confetti + badge pop-in + benefits reveal + Contributor destination preview.
+ */
 import React, { useEffect, useRef } from 'react';
 import {
   View,
@@ -12,27 +22,24 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import BenefitItem from '../components/BenefitItem';
 import { useJourney } from '../context/JourneyContext';
+import { STAGES } from '../data/journey';
 import { colors, typography, spacing, radius, shadows } from '../theme';
 
 const { width, height } = Platform.OS === 'web'
   ? { width: 393, height: 852 }
   : Dimensions.get('window');
 
-import { ONBOARDING_SURVEYS } from '../data/journey';
-const TOTAL_SURVEYS = ONBOARDING_SURVEYS.length; // 2
-const POINTS_EARNED = ONBOARDING_SURVEYS.reduce((s, sv) => s + sv.rewardPoints, 0); // 150
+const EXPLORER_STAGE = STAGES.find((s) => s.id === 1);
+const CONTRIBUTOR_STAGE = STAGES.find((s) => s.id === 2);
 
 // ─── Confetti ─────────────────────────────────────────────────────────────────
-const CONFETTI_COLORS = ['#1E56C8', '#8B5CF6', '#F59E0B', '#10B981', '#FFFFFF', '#60A5FA'];
+const CONFETTI_COLORS = ['#1E56C8', '#60A5FA', '#8B5CF6', '#F59E0B', '#FFFFFF', '#10B981'];
 const NUM_PIECES = 18;
 
 function ConfettiPiece({ index, total, delay }) {
   const angle = (index / total) * 2 * Math.PI;
-  const distance = 90 + Math.random() * 60;
-  const targetX = Math.cos(angle) * distance;
-  const targetY = Math.sin(angle) * distance - 40;
+  const distance = 85 + Math.random() * 65;
   const color = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
   const size = 7 + Math.random() * 8;
 
@@ -44,7 +51,10 @@ function ConfettiPiece({ index, total, delay }) {
     Animated.sequence([
       Animated.delay(delay),
       Animated.parallel([
-        Animated.spring(posAnim, { toValue: { x: targetX, y: targetY }, tension: 40, friction: 8, useNativeDriver: true }),
+        Animated.spring(posAnim, {
+          toValue: { x: Math.cos(angle) * distance, y: Math.sin(angle) * distance - 40 },
+          tension: 40, friction: 8, useNativeDriver: true,
+        }),
         Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
         Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
       ]),
@@ -53,22 +63,20 @@ function ConfettiPiece({ index, total, delay }) {
   }, []);
 
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        width: size, height: size, borderRadius: size / 2,
-        backgroundColor: color,
-        opacity: opacityAnim,
-        transform: [{ translateX: posAnim.x }, { translateY: posAnim.y }, { scale: scaleAnim }],
-      }}
-    />
+    <Animated.View style={{
+      position: 'absolute',
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: color,
+      opacity: opacityAnim,
+      transform: [{ translateX: posAnim.x }, { translateY: posAnim.y }, { scale: scaleAnim }],
+    }} />
   );
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-export default function CelebrationScreen() {
+export default function CelebrationScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { currentStage, nextStage, points, completeOnboarding } = useJourney();
+  const { completeOnboarding } = useJourney();
 
   const badgeAnim = useRef(new Animated.Value(0)).current;
   const badgeScale = useRef(new Animated.Value(0.3)).current;
@@ -88,8 +96,7 @@ export default function CelebrationScreen() {
     ]).start();
   }, []);
 
-  const stage = currentStage;
-  if (!stage) return null;
+  if (!EXPLORER_STAGE) return null;
 
   return (
     <LinearGradient
@@ -97,7 +104,10 @@ export default function CelebrationScreen() {
       style={[styles.container, { paddingTop: insets.top }]}
     >
       {/* Confetti */}
-      <View style={[styles.confettiOrigin, { top: height * 0.25, left: width / 2 }]} pointerEvents="none">
+      <View
+        style={[styles.confettiOrigin, { top: height * 0.25, left: width / 2 }]}
+        pointerEvents="none"
+      >
         {Array.from({ length: NUM_PIECES }, (_, i) => (
           <ConfettiPiece key={i} index={i} total={NUM_PIECES} delay={i * 30} />
         ))}
@@ -109,79 +119,82 @@ export default function CelebrationScreen() {
       >
         {/* Badge */}
         <Animated.View style={[styles.badgeArea, { opacity: badgeAnim, transform: [{ scale: badgeScale }] }]}>
-          <LinearGradient colors={stage.gradientColors} style={styles.badge}>
-            <Text style={styles.badgeEmoji}>{stage.icon}</Text>
+          <LinearGradient colors={EXPLORER_STAGE.gradientColors} style={styles.badge}>
+            <Text style={styles.badgeEmoji}>{EXPLORER_STAGE.icon}</Text>
           </LinearGradient>
           <View style={styles.unlockPill}>
-            <Text style={styles.unlockPillText}>🎉 Member Unlocked</Text>
+            <Text style={styles.unlockPillText}>🎉 Explorer Unlocked</Text>
           </View>
         </Animated.View>
 
         {/* Headline */}
         <Animated.View style={[styles.headlineArea, { opacity: titleAnim }]}>
-          <Text style={styles.stageName}>{stage.name}</Text>
-          <Text style={styles.headline}>You're in.</Text>
+          <Text style={styles.meaningLabel}>PARTICIPATE</Text>
+          <Text style={styles.stageName}>{EXPLORER_STAGE.name}</Text>
+          <Text style={styles.headline}>Onboarding complete.</Text>
           <Text style={styles.sub}>
-            {TOTAL_SURVEYS} surveys completed · {POINTS_EARNED} points earned.{'\n'}
-            Welcome to the Member's Mark community.
+            You're now an Explorer. Participate in Community activities
+            and earn progression points toward Contributor.
           </Text>
         </Animated.View>
 
-        {/* Points summary */}
-        <Animated.View style={[styles.statsCard, { opacity: contentAnim }]}>
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statNum}>+{POINTS_EARNED}</Text>
-              <Text style={styles.statLabel}>Points Earned</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statNum}>{points}</Text>
-              <Text style={styles.statLabel}>Total Points</Text>
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* Benefits unlocked */}
+        {/* Explorer benefits */}
         <Animated.View style={[styles.card, { opacity: contentAnim }]}>
           <Text style={styles.cardTitle}>Benefits now available</Text>
-          {stage.benefits.map((b, i) => (
-            <BenefitItem key={i} icon={b.icon} title={b.title} description={b.description} />
+          {EXPLORER_STAGE.benefits.map((b, i) => (
+            <View key={i} style={styles.benefitRow}>
+              <View style={styles.benefitIcon}><Text style={{ fontSize: 16 }}>{b.icon}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.benefitTitle}>{b.title}</Text>
+                <Text style={styles.benefitDesc}>{b.description}</Text>
+              </View>
+            </View>
           ))}
         </Animated.View>
 
-        {/* Explorer — coming soon */}
-        {nextStage && (
-          <Animated.View style={[styles.explorerCard, { opacity: contentAnim }]}>
-            <View style={styles.explorerHeader}>
-              <Text style={styles.lockEmoji}>🔒</Text>
-              <View>
-                <Text style={styles.explorerName}>{nextStage.name}</Text>
-                <Text style={styles.explorerStatus}>Coming soon</Text>
+        {/* Contributor destination */}
+        {CONTRIBUTOR_STAGE && (
+          <Animated.View style={[styles.contributorCard, { opacity: contentAnim }]}>
+            <View style={styles.contributorHeader}>
+              <Text style={styles.contributorEyebrow}>YOUR NEXT DESTINATION</Text>
+              <View style={[styles.lockedBadge, { backgroundColor: CONTRIBUTOR_STAGE.color + '18' }]}>
+                <Text style={[styles.lockedBadgeText, { color: CONTRIBUTOR_STAGE.color }]}>
+                  🔒 Locked
+                </Text>
               </View>
             </View>
-
-            <Text style={styles.explorerNote}>
-              {nextStage.comingSoonMessage ?? `${nextStage.name} is coming soon. Your progress is already counting.`}
-            </Text>
-
-            <View style={styles.explorerBenefitsLabel}>
-              <Text style={styles.explorerBenefitsTitle}>When Explorer arrives, you'll unlock:</Text>
+            <View style={styles.contributorRow}>
+              <Text style={styles.contributorEmoji}>{CONTRIBUTOR_STAGE.icon}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.contributorName}>{CONTRIBUTOR_STAGE.name}</Text>
+                <Text style={styles.contributorThreshold}>
+                  200 progression points
+                </Text>
+              </View>
             </View>
-            {nextStage.benefits.map((b, i) => (
-              <BenefitItem key={i} icon={b.icon} title={b.title} locked />
-            ))}
+            <Text style={styles.contributorDesc}>
+              Earn progression points by completing activities and surveys in the Community.
+              P2 activities earn 50 pts · P3 activities earn 30 pts.
+            </Text>
+            <View style={styles.contributorBenefitPills}>
+              {CONTRIBUTOR_STAGE.benefits.slice(0, 2).map((b, i) => (
+                <View key={i} style={styles.benefitPill}>
+                  <Text style={styles.benefitPillIcon}>{b.icon}</Text>
+                  <Text style={styles.benefitPillText} numberOfLines={1}>{b.title}</Text>
+                </View>
+              ))}
+            </View>
           </Animated.View>
         )}
 
         {/* CTA */}
         <Animated.View style={[styles.ctaArea, { opacity: contentAnim }]}>
           <TouchableOpacity
-            style={styles.ctaBtn}
+            style={[styles.ctaBtn, { backgroundColor: EXPLORER_STAGE.color }]}
             onPress={completeOnboarding}
             activeOpacity={0.9}
           >
-            <Text style={styles.ctaText}>Go to Home</Text>
+            <Text style={styles.ctaText}>Go to Community</Text>
             <Text style={styles.ctaArrow}> →</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -205,13 +218,9 @@ const styles = StyleSheet.create({
   },
   badgeArea: { alignItems: 'center', marginBottom: spacing.xl },
   badge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-    ...shadows.lg,
+    width: 96, height: 96, borderRadius: 48,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: spacing.md, ...shadows.lg,
   },
   badgeEmoji: { fontSize: 44 },
   unlockPill: {
@@ -222,7 +231,13 @@ const styles = StyleSheet.create({
   },
   unlockPillText: { ...typography.smallMed, color: '#FFFFFF' },
   headlineArea: { alignItems: 'center', marginBottom: spacing.xl },
-  stageName: { ...typography.h2, color: colors.gold, marginBottom: spacing.xs },
+  meaningLabel: {
+    ...typography.label,
+    color: colors.gold,
+    letterSpacing: 2,
+    marginBottom: spacing.xs,
+  },
+  stageName: { ...typography.h2, color: '#FFFFFF', marginBottom: spacing.xs },
   headline: { ...typography.hero, color: '#FFFFFF', marginBottom: spacing.sm },
   sub: {
     ...typography.body,
@@ -230,18 +245,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 26,
   },
-  statsCard: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    width: '100%',
-    marginBottom: spacing.md,
-  },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-  stat: { alignItems: 'center', flex: 1 },
-  statNum: { ...typography.h2, color: '#FFFFFF' },
-  statLabel: { ...typography.caption, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
-  statDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.15)' },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.xl,
@@ -251,7 +254,17 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   cardTitle: { ...typography.h4, color: colors.text, marginBottom: spacing.md },
-  explorerCard: {
+  benefitRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    gap: spacing.sm, marginBottom: spacing.sm,
+  },
+  benefitIcon: {
+    width: 34, height: 34, borderRadius: radius.sm,
+    backgroundColor: colors.bluePale, alignItems: 'center', justifyContent: 'center',
+  },
+  benefitTitle: { ...typography.smallMed, color: colors.text },
+  benefitDesc: { ...typography.caption, color: colors.textSecondary, marginTop: 1 },
+  contributorCard: {
     backgroundColor: colors.card,
     borderRadius: radius.xl,
     padding: spacing.lg,
@@ -260,40 +273,59 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: colors.border,
+    ...shadows.sm,
   },
-  explorerHeader: {
+  contributorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  contributorEyebrow: {
+    ...typography.label,
+    color: colors.textMuted,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  lockedBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+  },
+  lockedBadgeText: { ...typography.label, fontSize: 10 },
+  contributorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
     marginBottom: spacing.sm,
   },
-  lockEmoji: { fontSize: 24 },
-  explorerName: { ...typography.h3, color: colors.text },
-  explorerStatus: {
-    ...typography.caption,
-    color: colors.textMuted,
-    fontStyle: 'italic',
-    marginTop: 1,
-  },
-  explorerNote: {
+  contributorEmoji: { fontSize: 30 },
+  contributorName: { ...typography.h3, color: colors.text },
+  contributorThreshold: { ...typography.smallMed, color: colors.blue, marginTop: 2 },
+  contributorDesc: {
     ...typography.small,
     color: colors.textSecondary,
     lineHeight: 20,
     marginBottom: spacing.md,
-    fontStyle: 'italic',
   },
-  explorerBenefitsLabel: { marginBottom: spacing.sm },
-  explorerBenefitsTitle: { ...typography.smallMed, color: colors.textSecondary },
+  contributorBenefitPills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  benefitPill: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: colors.borderLight,
+    paddingHorizontal: spacing.sm, paddingVertical: 5,
+    borderRadius: radius.full, gap: 4,
+  },
+  benefitPillIcon: { fontSize: 12 },
+  benefitPillText: { ...typography.captionMed, color: colors.textSecondary, maxWidth: 120 },
   ctaArea: { width: '100%', marginBottom: spacing.lg },
   ctaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.blue,
     borderRadius: radius.full,
     paddingVertical: spacing.md + 4,
-    ...shadows.colored(colors.blue),
+    ...shadows.md,
   },
   ctaText: { ...typography.h4, color: '#FFFFFF' },
-  ctaArrow: { ...typography.h4, color: '#FFFFFF' },
+  ctaArrow: { ...typography.h4, color: 'rgba(255,255,255,0.7)' },
 });

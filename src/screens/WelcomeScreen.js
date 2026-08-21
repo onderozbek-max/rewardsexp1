@@ -8,16 +8,18 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useJourney } from '../context/JourneyContext';
 import { colors, typography, spacing, radius, shadows } from '../theme';
 
 const FEATURES = [
-  { icon: '📋', text: 'Complete existing activities and surveys' },
-  { icon: '⭐', text: 'Earn reward points for your participation' },
-  { icon: '🌟', text: 'Unlock stages and benefits as you progress' },
+  { icon: '📋', text: 'Complete activities and surveys to earn points' },
+  { icon: '🔭', text: 'Progress from Explorer toward Contributor' },
+  { icon: '✨', text: 'Unlock Contributor at 200 points and beyond' },
 ];
 
 export default function WelcomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { currentPhase } = useJourney();
 
   // Staggered entrance animations
   const logoAnim = useRef(new Animated.Value(0)).current;
@@ -115,7 +117,7 @@ export default function WelcomeScreen({ navigation }) {
       >
         <TouchableOpacity
           style={[styles.ctaButton, shadows.colored('#1E56C8')]}
-          onPress={() => navigation.navigate('Survey')}
+          onPress={() => navigation.navigate(currentPhase === 'control' ? 'Survey' : 'MemberCelebration')}
           activeOpacity={0.9}
         >
           <Text style={styles.ctaText}>Get Started</Text>

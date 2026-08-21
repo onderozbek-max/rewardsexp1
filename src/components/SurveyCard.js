@@ -31,14 +31,18 @@ export default function SurveyCard({ survey, onComplete, completed = false, disa
     // Simulate survey completion (1.5s)
     await new Promise((r) => setTimeout(r, 1500));
 
-    // Show "+50 pts" float
-    Animated.parallel([
-      Animated.timing(plusOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.timing(plusAnim, { toValue: -30, duration: 600, useNativeDriver: true }),
-      Animated.timing(checkAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-    ]).start(() => {
-      Animated.timing(plusOpacity, { toValue: 0, duration: 300, delay: 200, useNativeDriver: true }).start();
-    });
+    // Show "+N pts" float only when survey awards points
+    if (survey.rewardPoints > 0) {
+      Animated.parallel([
+        Animated.timing(plusOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(plusAnim, { toValue: -30, duration: 600, useNativeDriver: true }),
+        Animated.timing(checkAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start(() => {
+        Animated.timing(plusOpacity, { toValue: 0, duration: 300, delay: 200, useNativeDriver: true }).start();
+      });
+    } else {
+      Animated.timing(checkAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onComplete?.(survey.id, survey.rewardPoints);
@@ -64,10 +68,14 @@ export default function SurveyCard({ survey, onComplete, completed = false, disa
           </Text>
           <View style={styles.meta}>
             <Text style={styles.metaItem}>⏱ {survey.estimatedMinutes} min</Text>
-            <Text style={styles.metaDot}>·</Text>
-            <Text style={[styles.metaItem, styles.pointsText]}>
-              ⭐ +{survey.rewardPoints} pts
-            </Text>
+            {survey.rewardPoints > 0 && (
+              <>
+                <Text style={styles.metaDot}>·</Text>
+                <Text style={[styles.metaItem, styles.pointsText]}>
+                  ⭐ +{survey.rewardPoints} pts
+                </Text>
+              </>
+            )}
           </View>
         </View>
 

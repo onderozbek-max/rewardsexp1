@@ -1,11 +1,14 @@
 /**
- * StageTransitionScreen
+ * StageTransitionScreen — Moment 3 of 3 (Contributor unlock).
  *
- * Phase-aware: stageId ≤ maxUnlockableId → actual unlock celebration.
- *              stageId > maxUnlockableId → "coming soon" milestone.
- *
- * Triggered from HomeScreen when points cross a stage threshold for the first time.
+ * Triggered from HomeScreen when progression points cross 200 for the first time.
  * Route params: { stageId: number }
+ *
+ * For Experiment 1, only Contributor (id=2) can fire here.
+ * Influencer (id=3) and Co-creator (id=4) have thresholdTBD: true —
+ * they are never triggered via point-crossing. They appear as "future direction."
+ *
+ * isUnlocked = stageId <= maxUnlockableId (phase determines this).
  */
 import React, { useEffect, useRef } from 'react';
 import {
@@ -22,25 +25,25 @@ const { width, height } = Platform.OS === 'web'
   ? { width: 393, height: 852 }
   : Dimensions.get('window');
 
-// Confetti (unlock only)
-const CONFETTI_COLORS = ['#FFFFFF', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981'];
-const NUM_PIECES = 16;
+// Confetti
+const CONFETTI_COLORS = ['#FFFFFF', '#8B5CF6', '#60A5FA', '#F59E0B', '#10B981'];
+const NUM_PIECES = 18;
 
 function ConfettiPiece({ index, total, delay }) {
   const angle = (index / total) * 2 * Math.PI;
-  const dist = 80 + Math.random() * 60;
+  const dist = 80 + Math.random() * 65;
   const posAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const color = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
-  const size = 6 + Math.random() * 7;
+  const size = 6 + Math.random() * 8;
 
   useEffect(() => {
     Animated.sequence([
       Animated.delay(delay),
       Animated.parallel([
         Animated.spring(posAnim, {
-          toValue: { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist - 30 },
+          toValue: { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist - 35 },
           tension: 40, friction: 8, useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -65,8 +68,11 @@ export default function StageTransitionScreen({ route, navigation }) {
   const { stageId } = route.params ?? {};
 
   const stage = STAGES.find((s) => s.id === stageId);
-  const isUnlocked = stageId <= maxUnlockableId; // Phase determines this
+  const isUnlocked = stageId <= maxUnlockableId;
+
+  // Next stage for "up next" preview — may be TBD (Influencer)
   const nextPreviewStage = STAGES.find((s) => s.id === stageId + 1) ?? null;
+  const nextIsTBD = nextPreviewStage?.thresholdTBD === true;
 
   const badgeAnim = useRef(new Animated.Value(0)).current;
   const badgeScale = useRef(new Animated.Value(0.35)).current;
@@ -99,7 +105,7 @@ export default function StageTransitionScreen({ route, navigation }) {
           pointerEvents="none"
         >
           {Array.from({ length: NUM_PIECES }, (_, i) => (
-            <ConfettiPiece key={i} index={i} total={NUM_PIECES} delay={i * 35} />
+            <ConfettiPiece key={i} index={i} total={NUM_PIECES} delay={i * 30} />
           ))}
         </View>
       )}
@@ -122,13 +128,16 @@ export default function StageTransitionScreen({ route, navigation }) {
           )}
           <View style={styles.pill}>
             <Text style={styles.pillText}>
-              {isUnlocked ? '🎉 Stage Unlocked' : '⭐ Milestone Reached'}
+              {isUnlocked ? '🎉 Contributor Unlocked' : '⭐ Milestone Reached'}
             </Text>
           </View>
         </Animated.View>
 
         {/* Headline */}
         <Animated.View style={[styles.headlineArea, { opacity: contentAnim }]}>
+          {stage.meaning && (
+            <Text style={styles.meaningLabel}>{stage.meaning}</Text>
+          )}
           <Text style={[styles.stageName, { color: stage.color }]}>{stage.name}</Text>
           <Text style={styles.headline}>
             {isUnlocked ? 'Unlocked.' : 'You\'re making great progress.'}
@@ -136,14 +145,14 @@ export default function StageTransitionScreen({ route, navigation }) {
           <Text style={styles.sub}>
             {isUnlocked
               ? stage.unlockMessage
-              : `You've earned enough points to reach ${stage.name}. ${stage.comingSoonMessage ?? ''}`
+              : `You've earned enough to reach ${stage.name}. This stage is coming — your progress is already counting.`
             }
           </Text>
         </Animated.View>
 
-        {/* Benefits / status */}
+        {/* Benefits / status card */}
         <Animated.View style={[styles.card, { opacity: contentAnim }]}>
-          {isUnlocked ? (
+          {isUnlocked && stage.benefits ? (
             <>
               <Text style={styles.cardTitle}>Benefits now available</Text>
               {stage.benefits.map((b, i) => (
@@ -160,49 +169,64 @@ export default function StageTransitionScreen({ route, navigation }) {
             <>
               <Text style={styles.cardTitle}>What this means</Text>
               <Text style={styles.statusBody}>
-                {stage.name} isn't available yet, but your points are counting. When {stage.name} launches, you'll be among the first to unlock it.
+                {stage.name} isn't available yet, but your points are counting. When it launches, you'll be among the first to unlock it.
               </Text>
               <View style={styles.noteBox}>
-                <Text style={styles.noteText}>
-                  Keep participating to stay ready and build even more points.
-                </Text>
+                <Text style={styles.noteText}>Keep participating to stay ready.</Text>
               </View>
             </>
           )}
         </Animated.View>
 
         {/* Next stage preview */}
-        {nextPreviewStage && (
+        {nextPreviewStage && isUnlocked && (
           <Animated.View style={[styles.nextCard, { opacity: contentAnim }]}>
-            {isUnlocked ? (
+            {nextIsTBD ? (
+              // Future direction — Influencer or Co-creator with TBD threshold
               <>
                 <View style={styles.nextHeader}>
-                  <Text style={styles.nextHeaderLabel}>Up next</Text>
+                  <Text style={styles.nextHeaderLabel}>FUTURE DIRECTION</Text>
+                  <View style={styles.tbdBadge}>
+                    <Text style={styles.tbdBadgeText}>Threshold TBD</Text>
+                  </View>
+                </View>
+                <Text style={styles.nextName}>
+                  {nextPreviewStage.icon} {nextPreviewStage.name}
+                </Text>
+                <Text style={styles.nextMeaning}>{nextPreviewStage.meaning}</Text>
+                {nextPreviewStage.futureDirectionBenefits && (
+                  <View style={styles.futureList}>
+                    {nextPreviewStage.futureDirectionBenefits.map((item, i) => (
+                      <Text key={i} style={styles.futureItem}>· {item}</Text>
+                    ))}
+                  </View>
+                )}
+                <View style={styles.tbdNote}>
+                  <Text style={styles.tbdNoteText}>
+                    Influencer thresholds are under calibration and will be determined from Contributor participation data. No specific target is committed.
+                  </Text>
+                </View>
+              </>
+            ) : (
+              // Normal next stage with known threshold
+              <>
+                <View style={styles.nextHeader}>
+                  <Text style={styles.nextHeaderLabel}>UP NEXT</Text>
                   <View style={[styles.nextBadge, { backgroundColor: nextPreviewStage.color + '18' }]}>
                     <Text style={[styles.nextBadgeText, { color: nextPreviewStage.color }]}>🔒 Locked</Text>
                   </View>
                 </View>
                 <Text style={styles.nextName}>{nextPreviewStage.icon} {nextPreviewStage.name}</Text>
-                <View style={styles.nextBenefitPills}>
-                  {nextPreviewStage.benefits.slice(0, 2).map((b, i) => (
-                    <View key={i} style={styles.nextPill}>
-                      <Text style={styles.nextPillIcon}>{b.icon}</Text>
-                      <Text style={styles.nextPillText} numberOfLines={1}>{b.title}</Text>
-                    </View>
-                  ))}
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.nextHeader2}>When {stage.name} launches, you'll unlock:</Text>
-                <View style={styles.nextBenefitPills}>
-                  {stage.benefits.map((b, i) => (
-                    <View key={i} style={[styles.nextPill, styles.nextPillLocked]}>
-                      <Text style={styles.nextPillIcon}>{b.icon}</Text>
-                      <Text style={[styles.nextPillText, { color: colors.textMuted }]} numberOfLines={1}>{b.title}</Text>
-                    </View>
-                  ))}
-                </View>
+                {nextPreviewStage.benefits && (
+                  <View style={styles.nextBenefitPills}>
+                    {nextPreviewStage.benefits.slice(0, 2).map((b, i) => (
+                      <View key={i} style={styles.nextPill}>
+                        <Text style={styles.nextPillIcon}>{b.icon}</Text>
+                        <Text style={styles.nextPillText} numberOfLines={1}>{b.title}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </>
             )}
           </Animated.View>
@@ -250,6 +274,12 @@ const styles = StyleSheet.create({
   },
   pillText: { ...typography.smallMed, color: '#FFFFFF' },
   headlineArea: { alignItems: 'center', marginBottom: spacing.xl },
+  meaningLabel: {
+    ...typography.label,
+    color: colors.gold,
+    letterSpacing: 2,
+    marginBottom: spacing.xs,
+  },
   stageName: { ...typography.h2, marginBottom: spacing.xs },
   headline: { ...typography.h1, color: '#FFFFFF', textAlign: 'center', marginBottom: spacing.sm },
   sub: { ...typography.body, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 26 },
@@ -279,18 +309,30 @@ const styles = StyleSheet.create({
     padding: spacing.lg, width: '100%', marginBottom: spacing.xl, ...shadows.sm,
   },
   nextHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  nextHeaderLabel: { ...typography.label, color: colors.textMuted, fontSize: 10 },
+  nextHeaderLabel: { ...typography.label, color: colors.textMuted, fontSize: 10, letterSpacing: 1 },
   nextBadge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.full },
   nextBadgeText: { ...typography.label, fontSize: 9 },
-  nextName: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
-  nextHeader2: { ...typography.smallMed, color: colors.textSecondary, marginBottom: spacing.sm },
+  tbdBadge: {
+    backgroundColor: colors.goldLight,
+    paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.full,
+  },
+  tbdBadgeText: { ...typography.label, fontSize: 9, color: colors.goldDark },
+  nextName: { ...typography.h3, color: colors.text, marginBottom: 4 },
+  nextMeaning: { ...typography.label, color: colors.textMuted, fontSize: 10, letterSpacing: 1, marginBottom: spacing.sm },
+  futureList: { gap: 4, marginBottom: spacing.sm },
+  futureItem: { ...typography.small, color: colors.textSecondary, lineHeight: 20 },
+  tbdNote: {
+    backgroundColor: colors.goldLight, borderRadius: radius.md,
+    padding: spacing.md, borderLeftWidth: 3, borderLeftColor: colors.gold,
+    marginTop: spacing.xs,
+  },
+  tbdNoteText: { ...typography.caption, color: colors.goldDark, lineHeight: 18 },
   nextBenefitPills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   nextPill: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.borderLight, paddingHorizontal: spacing.sm,
     paddingVertical: 5, borderRadius: radius.full, gap: 4,
   },
-  nextPillLocked: { opacity: 0.75 },
   nextPillIcon: { fontSize: 12 },
   nextPillText: { ...typography.captionMed, color: colors.textSecondary, maxWidth: 120 },
   ctaArea: { width: '100%', marginBottom: spacing.lg },
